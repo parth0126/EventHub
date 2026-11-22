@@ -1,0 +1,231 @@
+{
+  "info": {
+    "name": "EventHub",
+    "description": "Requests for every item in the EventHub testing checklist. Run them in order: the create requests store event_id / reservation_id variables for later requests. For item 14 (middleware), watch the runserver terminal for log lines like 'GET /api/events/ - 200 - 0.00s'.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "event_id", "value": "1" },
+    { "key": "small_event_id", "value": "2" },
+    { "key": "completed_event_id", "value": "3" },
+    { "key": "reservation_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "1. Create event (201)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('event_id', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"PyCon India 2025\",\n  \"venue\": \"NIMHANS Convention Centre, Bangalore\",\n  \"date\": \"2025-09-20\",\n  \"total_seats\": 500,\n  \"available_seats\": 500,\n  \"status\": \"upcoming\"\n}" },
+        "url": "{{base_url}}/api/events/"
+      }
+    },
+    {
+      "name": "1b. Create small event (1 seat, for overbooking)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('small_event_id', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Tiny Workshop\",\n  \"venue\": \"Koramangala Hub, Bangalore\",\n  \"date\": \"2025-10-05\",\n  \"total_seats\": 1,\n  \"available_seats\": 1,\n  \"status\": \"upcoming\"\n}" },
+        "url": "{{base_url}}/api/events/"
+      }
+    },
+    {
+      "name": "1c. Create completed event",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('completed_event_id', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"PyCon India 2024\",\n  \"venue\": \"NIMHANS Convention Centre, Bangalore\",\n  \"date\": \"2024-09-20\",\n  \"total_seats\": 400,\n  \"available_seats\": 400,\n  \"status\": \"completed\"\n}" },
+        "url": "{{base_url}}/api/events/"
+      }
+    },
+    {
+      "name": "2. List all events",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{base_url}}/api/events/" }
+    },
+    {
+      "name": "3. Filter events by status",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Only completed events', () => pm.response.json().forEach(e => pm.expect(e.status).to.eql('completed')));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/events/?status=completed", "host": ["{{base_url}}"], "path": ["api", "events", ""], "query": [{ "key": "status", "value": "completed" }] }
+      }
+    },
+    {
+      "name": "4. Filter events by venue (case-insensitive partial)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('Venue contains nimhans', () => pm.response.json().forEach(e => pm.expect(e.venue.toLowerCase()).to.include('nimhans')));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/events/?venue=nimhans", "host": ["{{base_url}}"], "path": ["api", "events", ""], "query": [{ "key": "venue", "value": "nimhans" }] }
+      }
+    },
+    {
+      "name": "5. Create reservation (201, seats deducted)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('reservation_id', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"event\": {{event_id}},\n  \"attendee_name\": \"Priya Sharma\",\n  \"attendee_email\": \"priya@example.com\",\n  \"seats_reserved\": 2\n}" },
+        "url": "{{base_url}}/api/reservations/"
+      }
+    },
+    {
+      "name": "5b. Check event seats went down",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('available_seats is 498', () => pm.expect(pm.response.json().available_seats).to.eql(498));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{base_url}}/api/events/{{event_id}}/" }
+    },
+    {
+      "name": "6. Overbooking (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+        "pm.test('Error message', () => pm.expect(pm.response.json()).to.eql({ non_field_errors: ['Only 1 seat(s) available.'] }));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"event\": {{small_event_id}},\n  \"attendee_name\": \"Rahul Verma\",\n  \"attendee_email\": \"rahul@example.com\",\n  \"seats_reserved\": 2\n}" },
+        "url": "{{base_url}}/api/reservations/"
+      }
+    },
+    {
+      "name": "7. Reserve for completed event (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"event\": {{completed_event_id}},\n  \"attendee_name\": \"Priya Sharma\",\n  \"attendee_email\": \"priya@example.com\",\n  \"seats_reserved\": 1\n}" },
+        "url": "{{base_url}}/api/reservations/"
+      }
+    },
+    {
+      "name": "8. seats_reserved = 0 (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"event\": {{event_id}},\n  \"attendee_name\": \"Priya Sharma\",\n  \"attendee_email\": \"priya@example.com\",\n  \"seats_reserved\": 0\n}" },
+        "url": "{{base_url}}/api/reservations/"
+      }
+    },
+    {
+      "name": "9. Cancel reservation (200)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('200 OK', () => pm.response.to.have.status(200));",
+        "pm.test('Status cancelled', () => pm.expect(pm.response.json().status).to.eql('cancelled'));"
+      ]}}],
+      "request": { "method": "POST", "url": "{{base_url}}/api/reservations/{{reservation_id}}/cancel/" }
+    },
+    {
+      "name": "9b. Check event seats restored",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('available_seats is 500', () => pm.expect(pm.response.json().available_seats).to.eql(500));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{base_url}}/api/events/{{event_id}}/" }
+    },
+    {
+      "name": "10. Cancel twice (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+        "pm.test('Error message', () => pm.expect(pm.response.json()).to.eql({ error: 'Already cancelled.' }));"
+      ]}}],
+      "request": { "method": "POST", "url": "{{base_url}}/api/reservations/{{reservation_id}}/cancel/" }
+    },
+    {
+      "name": "11. Filter reservations by event_id",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('All for this event', () => pm.response.json().forEach(r => pm.expect(r.event).to.eql(Number(pm.collectionVariables.get('event_id')))));"
+      ]}}],
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/reservations/?event_id={{event_id}}", "host": ["{{base_url}}"], "path": ["api", "reservations", ""], "query": [{ "key": "event_id", "value": "{{event_id}}" }] }
+      }
+    },
+    {
+      "name": "12a. Create event with available > total (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Broken Event\",\n  \"venue\": \"Nowhere\",\n  \"date\": \"2025-12-01\",\n  \"total_seats\": 10,\n  \"available_seats\": 20\n}" },
+        "url": "{{base_url}}/api/events/"
+      }
+    },
+    {
+      "name": "12b. PATCH event available > total (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+      ]}}],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"available_seats\": 9999\n}" },
+        "url": "{{base_url}}/api/events/{{event_id}}/"
+      }
+    },
+    {
+      "name": "13a. Create reservation to delete",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('reservation_id', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"event\": {{event_id}},\n  \"attendee_name\": \"Ananya Rao\",\n  \"attendee_email\": \"ananya@example.com\",\n  \"seats_reserved\": 4\n}" },
+        "url": "{{base_url}}/api/reservations/"
+      }
+    },
+    {
+      "name": "13b. Delete confirmed reservation (204)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": { "method": "DELETE", "url": "{{base_url}}/api/reservations/{{reservation_id}}/" }
+    },
+    {
+      "name": "13c. Check event seats restored after delete",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('available_seats is 500', () => pm.expect(pm.response.json().available_seats).to.eql(500));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{base_url}}/api/events/{{event_id}}/" }
+    },
+    {
+      "name": "14. Middleware logging (check runserver terminal)",
+      "request": {
+        "method": "GET",
+        "description": "Send this, then look at the runserver terminal for a line like: INFO events.middleware: GET /api/events/ - 200 - 0.00s",
+        "url": "{{base_url}}/api/events/"
+      }
+    }
+  ]
+}
